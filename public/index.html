@@ -1,34 +1,252 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Chat AI</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: #121212;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      height: 90vh;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    h2 {
+      font-size: 28px;
+      font-weight: 600;
+      background: linear-gradient(90deg, #4facfe, #00f2fe);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+
+    .chat-box {
+      flex: 1;
+      background: #1e1e1e;
+      border-radius: 16px;
+      padding: 20px;
+      overflow-y: auto;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 14px 18px;
+      border-radius: 18px;
+      line-height: 1.5;
+      position: relative;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .user {
+      background: #2d3748;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+
+    .ai {
+      background: #1a202c;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+
+    .input-area {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    #prompt {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: #2d3748;
+      color: white;
+      font-size: 16px;
+      resize: none;
+      outline: none;
+    }
+
+    #prompt::placeholder {
+      color: #a0aec0;
+    }
+
+    button {
+      background: #4facfe;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 0 24px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    button:hover {
+      background: #3182ce;
+      transform: translateY(-2px);
+    }
+
+    button:disabled {
+      background: #718096;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 10px;
+    }
+
+    .loading:after {
+      content: " .";
+      animation: dots 1.5s infinite;
+    }
+
+    @keyframes dots {
+      0%, 20% { content: " ."; }
+      40% { content: " .."; }
+      60%, 100% { content: " ..."; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Scrollbar styling */
+    .chat-box::-webkit-scrollbar {
+      width: 8px;
+    }
+    .chat-box::-webkit-scrollbar-track {
+      background: #1a202c;
+    }
+    .chat-box::-webkit-scrollbar-thumb {
+      background: #4a5568;
+      border-radius: 4px;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        height: 95vh;
+      }
+      .message {
+        max-width: 90%;
+      }
+      button {
+        padding: 14px 20px;
+      }
+    }
+  </style>
+</head>
 <body>
 
-<h2>Chat AI</h2>
+  <div class="container">
+    <header>
+      <h2>💬 Chat AI</h2>
+    </header>
 
-<textarea id="prompt" rows="4" cols="50"></textarea>
-<br><br>
+    <div class="chat-box" id="chatBox">
 
-<button onclick="send()">Kirim</button>
+    </div>
 
-<pre id="response"></pre>
+    <div class="input-area">
+      <textarea 
+        id="prompt" 
+        rows="3" 
+        placeholder="Ketik pesan Anda di sini..."
+        maxlength="500"
+      ></textarea>
+      <button id="sendBtn" onclick="sendMessage()">Kirim</button>
+    </div>
+  </div>
 
-<script>
-async function send() {
+  <script>
+    const chatBox = document.getElementById('chatBox');
+    const promptInput = document.getElementById('prompt');
+    const sendBtn = document.getElementById('sendBtn');
 
-    const text = document.getElementById("prompt").value;
+    function addMessage(text, isUser = true) {
+      const messageDiv = document.createElement('div');
+      messageDiv.classList.add('message', isUser ? 'user' : 'ai');
+      messageDiv.textContent = text;
+      chatBox.appendChild(messageDiv);
+      chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll ke bawah
+    } 
 
-    const res = await fetch("/chat", {
-        method: "POST",
-        headers: {
+    async function sendMessage() {
+      const text = promptInput.value.trim();
+      if (!text) return;
+
+      addMessage(text, true);
+      promptInput.value = '';
+      promptInput.disabled = true;
+      sendBtn.disabled = true;
+      sendBtn.innerHTML = '<span class="loading"></span>';
+
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: {
             "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ prompt: text })
+          },
+          body: JSON.stringify({ prompt: text })
+        });
+
+        const data = await res.json();
+        addMessage(data.reply || "Maaf, saya tidak bisa membalas saat ini.", false);
+      } catch (error) {
+        addMessage("Gagal terhubung ke server. Coba lagi nanti.", false);
+      } finally {
+        promptInput.disabled = false;
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Kirim';
+        promptInput.focus();
+      }
+    }
+
+    promptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
     });
 
-    const data = await res.json();
-
-    document.getElementById("response").innerText = data.reply;
-}
-</script>
+    promptInput.focus();
+  </script>
 
 </body>
 </html>
